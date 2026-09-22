@@ -1,0 +1,44 @@
+services:
+  db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-employee_portal}
+      MYSQL_USER: ${MYSQL_USER:-employee_app}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-local-password}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-local-root-password}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+
+  api:
+    build: ./apps/api
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_URL: jdbc:mysql://db:3306/${MYSQL_DATABASE:-employee_portal}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      DB_USERNAME: ${MYSQL_USER:-employee_app}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-local-password}
+      BACKGROUND_CHECK_BASE_URL: ${BACKGROUND_CHECK_BASE_URL:-https://54capvm12g.execute-api.ap-northeast-2.amazonaws.com}
+      BACKGROUND_CHECK_CANDIDATE_KEY: ${BACKGROUND_CHECK_CANDIDATE_KEY:-not-configured}
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "8080"
+    restart: unless-stopped
+
+  web:
+    build: ./apps/web
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
